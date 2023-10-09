@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        #controls{
+    display: flex; 
+    position: absolute; 
+    left: 50%; 
+    transform: translateX(-50%); bottom: 1; gap: 1em;
+}
+
+.button{
+    cursor: pointer;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-size: 3em;
+    border-radius: 0.5em;
+    border: 2px solid white;
+    padding: 1em 2em
+}
+    </style>
+</head>
+<body>
+
+    <canvas id="canvas" width="1300" height="1000"></canvas>
+    <div id="controls"></div>
+    <script type="importmap">
+        {
+        "imports": {
+            "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.157.0/examples/jsm/"
+        }
+        }
+    </script>
+    
+    <script type="module">
+    import * as THREE from 'three';
+    import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+    import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+    
+    const scene = new THREE.Scene();
+
+    const renderer = new THREE.WebGLRenderer({
+        canvas: document.querySelector('#canvas'),
+        antialias: true
+    });
+    // renderer.outputEncoding = THREE.sRGBEncoding;
+    let camera = new THREE.PerspectiveCamera(100,2);
+    camera.position.set(0,0,10)
+    scene.background = new THREE.Color('white');
+    const ambientLight = new THREE.AmbientLight( 0xffffff, 3.5 );
+    scene.add( ambientLight );
+
+    const dirLight = new THREE.DirectionalLight( 0xefefff, 3.5 );
+    dirLight.position.set( 0, 0, 10 );
+    scene.add( dirLight );
+    const light = new THREE.SpotLight(0xFFFFFF, 1);
+    scene.add(light);
+    scene.add(light.target);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.update();
+    renderer.outputColorSpace  = THREE.SRGBColorSpace;
+
+    /**
+     *
+     * @description Three js obj prototype
+     * 
+     */
+    function threeObj(){
+        this.mixer; // animation mixer
+        this.time = new THREE.Clock();    // deltaTime
+        this.loader; //  gltf loader
+        this.obj; // gltf or obj, glb
+        this.animations; //animation list 
+        this.animationMap ={};
+        this.currentAnimation; // current Animation Action
+        //obj Loader
+        this.setLoader = async (path) => {
+            this.loader = new GLTFLoader();
+            await Promise.all(
+                [this.loader.loadAsync(path)]
+            ).then((result) => {
+                [this.obj] = result
+                scene.add(this.obj.scene)
+            })
+        }
+        //obj position set
+        this.setPositon = (x,y,z) =>{
+            console.log(this.obj);
+            this.obj.scene.position.set(x,y,z);
+        }
+        //obj scale set
+        this.setScale = (x,y,z) => {
+            this.obj.scene.scale.set(x,y,z);
+        }
+        //애니메이션 동작을 담아두는 세터
+        this.setAnimation = (isMultiple = false) => {
+            this.animations = this.obj.animations
+            this.mixer = new THREE.AnimationMixer(this.obj.scene)
+            const controller = document.getElementById('controls')
+            this.animations.forEach(element => {
+                const animationAction = this.mixer.clipAction(element)
+                this.animationMap[element.name] = animationAction;
+                if(isMultiple){ // 애니메이션이 여러개가 있다면 컨트롤러를 만든다.
+                    const btn = document.createElement('div')
+                    btn.innerText = element.name;
+                    btn.classList.add('button')
+                    controller.appendChild(btn)   
+                    btn.addEventListener('click', () => {
+                        const name = btn.innerHTML;
+                        this.changeAnimation(name)
+                    }) 
+                }
+            });
+        }
+        //애니메이션 바꾸기
+        this.changeAnimation = (name) =>{
+            const preAction = this.currentAnimation;
+            this.currentAnimation = this.animationMap[name];
+            if(preAction !== this.currentAnimation){
+                preAction.fadeOut(0.5);
+                this.currentAnimation.reset().fadeIn(0.5).play()
+            }
+        }
+        //애니메이션 현재 동작 설정
+        this.setCurrentAction = (action) =>{
+            this.currentAnimation = this.animationMap[action];
+            this.currentAnimation.play();
+        }
+        this.setRotate = (way, num) => {
+            way === 'right' ? this.obj.scene.rotation.y += num : this.obj.scene.rotation.y -= num
+        }
+    }
+
+    const dog = new threeObj();
+    const cat = new threeObj();
+    const dog2 = new threeObj();
+    const mouse = new threeObj();
+    const monster = new threeObj();
+    async function runObj() {
+        await dog.setLoader("./shiba/scene.gltf")
+        await cat.setLoader("./cat/scene.gltf")
+        await dog2.setLoader("./shiba/scene.gltf")
+        await mouse.setLoader("./mouse/cac-1696774826485.glb")
+        await monster.setLoader("./monster/cac-1696837674253.glb")
+    
+        dog.setPositon(13, 0, 0);
+        dog2.setPositon(9, 0, 0);
+        cat.setPositon(11.2, -1.3, 0);
+        mouse.setPositon(11.2, -2, 0);
+        monster.setPositon(1.2, -2, 0);
+        cat.setScale(0.004, 0.004, 0.004);
+        mouse.setScale(0.003, 0.003, 0.003);
+        monster.setScale(0.07, 0.07, 0.07);
+        cat.setAnimation()
+        mouse.setAnimation()
+        cat.setCurrentAction('Scene')
+        mouse.setCurrentAction('Walking')
+        monster.setAnimation(true)
+        monster.setCurrentAction('BreathingIdle')
+        
+        const animate = () => {
+            requestAnimationFrame(animate);
+            dog.setRotate('right', 0.01)
+            dog2.setRotate('left', 0.01)
+            renderer.render(scene, camera);
+            const objList = [dog,cat,dog2,mouse,monster]
+            objList.map(item => {
+                if(item.mixer){
+                    const mixerUpdateDelta = item.time.getDelta();
+                    item.mixer.update(mixerUpdateDelta) 
+                }
+            })
+            controls.update();
+        };
+        animate();
+
+    }
+    await runObj();
+    
+    </script>
+</body>
+</html>
